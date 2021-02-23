@@ -80,6 +80,8 @@ class Player:
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        self.width = self.image.get_width()
+        self.height = self.image.get_height()
         self.vel_y = 0
         self.jumped = False
         self.dir_facing = 1
@@ -124,9 +126,21 @@ class Player:
 
         # Check for collisions
         for tile in world.tile_list:
+            # Checking x-axis collision
+            if tile[1].colliderect(self.rect.x + delta_x, self.rect.y, self.width, self.height):
+                # Stop moving if collision is detected
+                delta_x = 0
+                
             # Checking y-axis collision
-            if tile[1].colliderect(self.rect):
-
+            if tile[1].colliderect(self.rect.x, self.rect.y + delta_y, self.width, self.height):
+                # Check if below the ground
+                if self.vel_y < 0:
+                    delta_y = tile[1].bottom - self.rect.top
+                    self.vel_y = 0
+                # Check if above the ground
+                elif self.vel_y >= 0:
+                    delta_y = tile[1].top - self.rect.bottom
+                    self.vel_y = 0
 
         # Update the player's coordinates
         self.rect.x += delta_x
