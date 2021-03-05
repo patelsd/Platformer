@@ -14,6 +14,7 @@ pygame.display.set_caption('Platformer')
 
 # Define game variables
 tile_size = 50
+game_over = False
 
 # Load images
 bg_img = pygame.transform.scale(pygame.image.load('img/sky.png'), (screen_width, screen_height))
@@ -58,6 +59,9 @@ class World:
                 if tile == 3:
                     blob = Enemy(col_count * tile_size, row_count * tile_size + 15)
                     blob_group.add(blob)
+                if tile == 6:
+                    lava = Lava(col_count * tile_size, row_count * tile_size + int(tile_size // 2))
+                    nature_group.add(lava)
 
                 col_count += 1
             row_count += 1
@@ -85,6 +89,16 @@ class Enemy(pygame.sprite.Sprite):
             self.move_count *= -1
 
 
+class Lava(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        img = pygame.image.load('img/lava.png')
+        self.image = pygame.transform.scale(img, (tile_size, tile_size // 2))
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+
 class Player:
     def __init__(self, x, y):
         self.images_right, self.images_left = [], []
@@ -98,6 +112,7 @@ class Player:
             self.images_right.append(right_img)
             self.images_left.append(left_img)
 
+        self.ghost = pygame.image.load('img/ghost.png')
         self.image = self.images_right[self.index]
         self.rect = self.image.get_rect()
         self.rect.x = x
@@ -108,72 +123,83 @@ class Player:
         self.jumped = False
         self.dir_facing = 1
 
-    def update(self):
+    def update(self, game_over):
         delta_x = 0
         delta_y = 0
         walk_cooldown = 5
 
-        # Get key presses
-        key = pygame.key.get_pressed()
+        if not game_over:
+            # Get key presses
+            key = pygame.key.get_pressed()
 
-        if key[pygame.K_SPACE] and not self.jumped:
-            self.vel_y = -15
-            self.jumped = True
-        if not key[pygame.K_SPACE]:
-            self.jumped = False
-        if key[pygame.K_LEFT]:
-            delta_x -= 5
-            self.counter += 1
-            self.dir_facing = -1
-        if key[pygame.K_RIGHT]:
-            delta_x += 5
-            self.counter += 1
-            self.dir_facing = 1
-        if not key[pygame.K_RIGHT] and not key[pygame.K_LEFT]:
-            standing(self)
+            if key[pygame.K_SPACE] and not self.jumped:
+                self.vel_y = -15
+                self.jumped = True
+            if not key[pygame.K_SPACE]:
+                self.jumped = False
+            if key[pygame.K_LEFT]:
+                delta_x -= 5
+                self.counter += 1
+                self.dir_facing = -1
+            if key[pygame.K_RIGHT]:
+                delta_x += 5
+                self.counter += 1
+                self.dir_facing = 1
+            if not key[pygame.K_RIGHT] and not key[pygame.K_LEFT]:
+                standing(self)
 
-        # Handling animations
-        if self.counter > walk_cooldown:
-            self.counter = 0
-            self.index += 1
-            if self.index >= len(self.images_right):
-                self.index = 0
-            self.image = self.images_right[self.index] if (self.dir_facing == 1) else self.images_left[self.index]
+            # Handling animations
+            if self.counter > walk_cooldown:
+                self.counter = 0
+                self.index += 1
+                if self.index >= len(self.images_right):
+                    self.index = 0
+                self.image = self.images_right[self.index] if (self.dir_facing == 1) else self.images_left[self.index]
 
-        # Adding gravity
-        self.vel_y += 1
-        if self.vel_y > 10:
-            self.vel_y = 10
-        delta_y += self.vel_y
+            # Adding gravity
+            self.vel_y += 1
+            if self.vel_y > 10:
+                self.vel_y = 10
+            delta_y += self.vel_y
 
-        # Check for collisions
-        for tile in world.tile_list:
-            # Checking x-axis collision
-            if tile[1].colliderect(self.rect.x + delta_x, self.rect.y, self.width, self.height):
-                # Stop moving if collision is detected
-                delta_x = 0
-                
-            # Checking y-axis collision
-            if tile[1].colliderect(self.rect.x, self.rect.y + delta_y, self.width, self.height):
-                # Check if below the ground
-                if self.vel_y < 0:
-                    delta_y = tile[1].bottom - self.rect.top
-                    self.vel_y = 0
-                # Check if above the ground
-                elif self.vel_y >= 0:
-                    delta_y = tile[1].top - self.rect.bottom
-                    self.vel_y = 0
+            # Check for collisions
+            for tile in world.tile_list:
+                # Checking x-axis collision
+                if tile[1].colliderect(self.rect.x + delta_x, self.rect.y, self.width, self.height):
+                    # Stop moving if collision is detected
+                    delta_x = 0
 
-        # Update the player's coordinates
-        self.rect.x += delta_x
-        self.rect.y += delta_y
+                # Checking y-axis collision
+                if tile[1].colliderect(self.rect.x, self.rect.y + delta_y, self.width, self.height):
+                    # Check if below the ground
+                    if self.vel_y < 0:
+                        delta_y = tile[1].bottom - self.rect.top
+                        self.vel_y = 0
+                    # Check if above the ground
+                    elif self.vel_y >= 0:
+                        delta_y = tile[1].top - self.rect.bottom
+                        self.vel_y = 0
 
-        if self.rect.bottom > screen_height:
-            self.rect.bottom = screen_height
-            delta_y = 0
+            # Check for enemy collisions
+            if pygame.sprite.spritecollide(self, blob_group, False):
+                game_over = True
 
+            # Check for nature collisions
+            if pygame.sprite.spritecollide(self, nature_group, False):
+                game_over = True
+
+            # Update the player's coordinates
+            self.rect.x += delta_x
+            self.rect.y += delta_y
+
+        elif game_over:
+            self.image = self.ghost
+            if self.rect.y > 200:
+                self.rect.y -= 5
         # Draws player onto the screen
         screen.blit(self.image, self.rect)
+
+        return game_over
 
 
 world_data = [
@@ -201,6 +227,7 @@ world_data = [
 
 player = Player(100, screen_height - 130)
 blob_group = pygame.sprite.Group()
+nature_group = pygame.sprite.Group()
 world = World(world_data)
 
 run = True
@@ -212,8 +239,9 @@ while run:
 
     blob_group.update()
     blob_group.draw(screen)
+    nature_group.draw(screen)
 
-    player.update()
+    game_over = player.update(game_over)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
