@@ -55,12 +55,34 @@ class World:
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
+                if tile == 3:
+                    blob = Enemy(col_count * tile_size, row_count * tile_size + 15)
+                    blob_group.add(blob)
+
                 col_count += 1
             row_count += 1
 
     def draw(self):
         for tile in self.tile_list:
             screen.blit(tile[0], tile[1])
+
+
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load('img/blob.png')
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.move_direction = 1
+        self.move_count = 0
+
+    def update(self):
+        self.rect.x += self.move_direction
+        self.move_count += 1
+        if abs(self.move_count) > 50:
+            self.move_direction *= -1
+            self.move_count *= -1
 
 
 class Player:
@@ -177,8 +199,9 @@ world_data = [
     [1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ]
 
-world = World(world_data)
 player = Player(100, screen_height - 130)
+blob_group = pygame.sprite.Group()
+world = World(world_data)
 
 run = True
 while run:
@@ -186,6 +209,10 @@ while run:
 
     screen.blit(bg_img, (0, 0))
     world.draw()
+
+    blob_group.update()
+    blob_group.draw(screen)
+
     player.update()
 
     for event in pygame.event.get():
